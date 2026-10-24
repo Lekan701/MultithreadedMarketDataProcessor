@@ -1,109 +1,142 @@
+
 package aspectcapital.question1;
 
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.util.*;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-
-
 class QuestionOneTest {
 
-    private static <T> List<T> list(T... items) {
-        return new ArrayList<>(Arrays.asList(items));
+    @Test
+    void shouldAddOneToEachInteger() {
+        List<Integer> input = Arrays.asList(1, 2, 3);
+
+        List<Integer> result =
+                QuestionOne.map(n -> n + 1, input);
+
+        assertEquals(Arrays.asList(2, 3, 4), result);
     }
 
     @Test
-    @DisplayName("Given some integers, when I map them to strings, then I get their string forms")
-    void givenIntsWhenMapToStringsThenStringsList() {
-        // Given
-        List<Integer> numbers = list(1, 2, 3, 10);
-        Function<Integer, String> toStringFunction = Object::toString;
+    void shouldMapStringsToIntegers() {
+        List<String> input = Arrays.asList("Apple", "Kiwi");
 
-        // When
-        List<String> result = QuestionOne.map(toStringFunction, numbers);
+        List<Integer> result =
+                QuestionOne.map(String::length, input);
 
-        // Then
-        assertEquals(list("1", "2", "3", "10"), result);
+        assertEquals(Arrays.asList(5, 4), result);
     }
 
     @Test
-    @DisplayName("Given some words, when I map to lengths, then I get the length of the words")
-    void givenStringsWhenMapToLengthThenListOfLengths() {
-        // Given
-        List<String> words = list("a", "bb", "ccc", "hello");
-        Function<String, Integer> stringLengthFunction = String::length;
+    void shouldMapIntegersToStrings() {
+        List<Integer> input = Arrays.asList(10, 20);
 
-        // When
-        List<Integer> lengths = QuestionOne.map(stringLengthFunction, words);
+        List<String> result =
+                QuestionOne.map(Object::toString, input);
 
-        // Then
-        assertEquals(list(1, 2, 3, 5), lengths);
+        assertEquals(Arrays.asList("10", "20"), result);
     }
 
     @Test
-    @DisplayName("Given an empty list, when I map it, then I get an empty list back")
-    void givenEmptyListWhenMappedThenReturnEmptyList() {
-        // Given
-        List<String> empty = Collections.emptyList();
-        Function<String, Integer> stringLengthFunction = String::length;
+    void shouldReturnEmptyListForEmptyInput() {
+        List<Integer> input = Collections.emptyList();
 
-        // When
-        List<Integer> result = QuestionOne.map(stringLengthFunction, empty);
+        List<Integer> result =
+                QuestionOne.map(n -> n + 1, input);
 
-        // Then
         assertNotNull(result);
         assertTrue(result.isEmpty());
+        assertNotSame(input, result);
     }
 
     @Test
-    @DisplayName("Given a list with nulls, when mapper handles nulls, then mapping should return -1")
-    void givenNullsInListWhenMappedThenNullReturnsNegativeOne() {
-        // Given
-        List<String> inputs = list(null, "hi", "testing", null);
-        Function<String, Integer> stringLengthFunction = s -> (s == null ? -1 : s.length());
-
-        // When
-        List<Integer> result = QuestionOne.map(stringLengthFunction, inputs);
-
-        // Then
-        assertEquals(list(-1, 2, 7, -1), result);
+    void shouldRejectNullList() {
+        assertThrows(NullPointerException.class,
+                () -> QuestionOne.map(
+                        String::length, null));
     }
 
     @Test
-    @DisplayName("Null function returns NullPointerException")
-    void givenNullFunctionWhenMapAttemptThenThrowsNPE() {
-        // Given
-        List<String> inputs = list("Testing123...");
+    void shouldRejectNullFunction() {
+        List<Integer> input = Arrays.asList(1, 2);
 
-        // When / Then
-        assertThrows(NullPointerException.class, () -> QuestionOne.map(null, inputs));
+        assertThrows(NullPointerException.class,
+                () -> QuestionOne.map(null, input));
     }
 
     @Test
-    @DisplayName("Given a null input list, when I call map, then I should get a NullPointerException")
-    void givenNullListWhenMapThenThrowsNPE() {
-        // Given
-        Function<String, Integer> stringLengthFunction = String::length;
+    void shouldNotModifyOriginalList() {
+        List<Integer> input =
+                new ArrayList<>(Arrays.asList(1, 2, 3));
 
-        // When / Then
-        assertThrows(NullPointerException.class, () -> QuestionOne.map(stringLengthFunction, null));
+        List<Integer> original = new ArrayList<>(input);
+
+        List<Integer> result =
+                QuestionOne.map(n -> n * 2, input);
+
+        assertEquals(original, input);
+        assertEquals(Arrays.asList(2, 4, 6), result);
+        assertNotSame(input, result);
     }
 
     @Test
-    @DisplayName("Given inputs in a certain order, list transformation as per funcxtion preserves order")
-    void givenInputsWhenMapThenOrderPreserved() {
-        // Given
-        List<Integer> inputs = list(5, 1, 4, 2, 3);
-        Function<Integer, Integer> squaredFunction = x -> x * x;
+    void shouldPreserveOrderAndDuplicates() {
+        List<Integer> input = Arrays.asList(3, 1, 3, 2);
 
-        // When
-        List<Integer> squared = QuestionOne.map(squaredFunction, inputs);
+        List<Integer> result =
+                QuestionOne.map(n -> n * 2, input);
 
-        // Then
-        assertEquals(list(25, 1, 16, 4, 9), squared);
+        assertEquals(Arrays.asList(6, 2, 6, 4), result);
+    }
+
+    @Test
+    void shouldHandleNullElementsWithSafeFunction() {
+        List<String> input = Arrays.asList("A", null, "B");
+
+        List<Integer> result = QuestionOne.map(
+                s -> s == null ? 0 : s.length(),
+                input
+        );
+
+        assertEquals(Arrays.asList(1, 0, 1), result);
+    }
+
+    @Test
+    void shouldAllowFunctionToReturnNull() {
+        List<String> input = Arrays.asList("A", "B");
+
+        List<String> result =
+                QuestionOne.map(s -> null, input);
+
+        assertEquals(Arrays.asList(null, null), result);
+    }
+
+    @Test
+    void shouldPropagateFunctionException() {
+        List<String> input = Arrays.asList("1", "invalid");
+
+        assertThrows(NumberFormatException.class,
+                () -> QuestionOne.map(
+                        Integer::parseInt, input));
+    }
+
+    @Test
+    void shouldNotMutateMutableElementsWithPureMapper() {
+        StringBuilder first = new StringBuilder("hello");
+        List<StringBuilder> input =
+                Collections.singletonList(first);
+
+        List<String> result = QuestionOne.map(
+                sb -> sb.toString().toUpperCase(),
+                input
+        );
+
+        assertEquals(Collections.singletonList("HELLO"), result);
+        assertEquals("hello", first.toString());
+        assertSame(first, input.get(0));
     }
 }

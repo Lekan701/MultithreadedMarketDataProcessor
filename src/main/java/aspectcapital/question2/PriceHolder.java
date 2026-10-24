@@ -1,41 +1,83 @@
 package aspectcapital.question2;
 
 import java.math.BigDecimal;
-import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicReference;
 
 /** Question 2 implementation */
 public final class PriceHolder {
 
-    private static class Details {
-        final AtomicReference<BigDecimal> currentPrice = new AtomicReference<>();
-        final AtomicReference<BigDecimal> hotPrice     = new AtomicReference<>();
+    private static class PriceState {
+        BigDecimal price;
+        boolean changed;
 
-        Details(BigDecimal firstPrice) {
-            this.hotPrice.set(firstPrice);
+        PriceState(BigDecimal price) {
+            this.price = price;
+            this.changed = true;
         }
     }
 
-    private final ConcurrentHashMap<String, Details> priceBook = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, PriceState> priceBook;
 
-    public PriceHolder() { }
+    public PriceHolder() {
+        this.priceBook = new ConcurrentHashMap<>();
+    }
 
     /** Called when a price ‘p’ is received for an entity ‘e’ */
     public void putPrice(String e, BigDecimal p) {
-        if (Objects.isNull(e)) throw new NullPointerException("Entity is null");
-        if (Objects.isNull(p)) throw new NullPointerException("Price is null");
 
-        Details details = priceBook.computeIfAbsent(e, key -> new Details(p));
-        details.hotPrice.set(p);
+        if(e == null){
+            throw new NullPointerException("Null entity");
+        }
+
+        if(e.isEmpty()){
+            throw new IllegalArgumentException("Blank entity");
+        }
+
+        if(p == null){
+            throw new NullPointerException("Invalid price");
+        }
+
+        e = e.toUpperCase();
+
+        priceBook.compute(e, (key, state) -> {
+
+            if (state == null) {
+                return new PriceState(p);
+            }
+
+            synchronized (state) {
+                state.price = p;
+                state.changed = true;
+            }
+
+            return state;
+        });
+
     }
 
     /** Called to get the latest price for entity ‘e’ */
     public BigDecimal getPrice(String e) {
-        Details entityDetails = priceBook.get(e);
-        BigDecimal latestPrice = entityDetails.hotPrice.get();
-        entityDetails.currentPrice.set(latestPrice);
-        return latestPrice;
+
+        if(e == null){
+            throw new NullPointerException("Null entity");
+        }
+
+        if(e.isEmpty()){
+            throw new IllegalArgumentException("Blank entity");
+        }
+
+        e = e.toUpperCase();
+
+        PriceState state = priceBook.get(e);
+
+        if (state == null){
+            return null;
+        }
+
+        synchronized (state) {
+            state.changed = false;
+            return state.price;
+        }
     }
 
     /**
@@ -43,17 +85,25 @@ public final class PriceHolder {
      * changed since the last call to getPrice(e).
      */
     public boolean hasPriceChanged(String e) {
-        Details entityDetails = priceBook.get(e);
 
-        BigDecimal latestPrice = entityDetails.hotPrice.get();
-        BigDecimal lastPrice = entityDetails.currentPrice.get();
+        if(e == null){
+            throw new NullPointerException("Null entity");
+        }
 
-        if (latestPrice == null && lastPrice == null) {
+        if(e.isEmpty()){
+            throw new IllegalArgumentException("Blank entity");
+        }
+
+        e = e.toUpperCase();
+
+        PriceState state = priceBook.get(e);
+
+        if (state == null) {
             return false;
         }
-        if (latestPrice == null || lastPrice == null) {
-            return true;
+
+        synchronized (state) {
+            return state.changed;
         }
-        return latestPrice.compareTo(lastPrice) != 0;
     }
 }

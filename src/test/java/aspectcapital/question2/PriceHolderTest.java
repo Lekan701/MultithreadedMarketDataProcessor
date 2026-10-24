@@ -1,131 +1,424 @@
+
 package aspectcapital.question2;
 
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.*;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-
 class PriceHolderTest {
 
-    private static BigDecimal bd(String s) {
-        return new BigDecimal(s);
+    private final PriceHolder priceHolder = new PriceHolder();
+
+    @Test
+    void shouldRejectNullEntityOnPutPrice() {
+        assertThrows(NullPointerException.class,
+                () -> priceHolder.putPrice(null, BigDecimal.TEN));
     }
 
     @Test
-    @DisplayName("Given a null entity, when putPrice is called, then it throws NullPointerException")
-    void givenNullEntityWhenPutPriceThenThrowsNPE() {
-        // Given
-        PriceHolder priceHolder = new PriceHolder();
-
-        // When / Then
-        assertThrows(NullPointerException.class, () -> priceHolder.putPrice(null, bd("1.23")));
+    void shouldRejectNullPriceOnPutPrice() {
+        assertThrows(NullPointerException.class,
+                () -> priceHolder.putPrice("A", null));
     }
 
     @Test
-    @DisplayName("Given a null price, when putPrice is called, then it throws NullPointerException")
-    void givenNullPriceWhenPutPriceThenThrowsNPE() {
-        // Given
-        PriceHolder priceHolder = new PriceHolder();
-
-        // When / Then
-        assertThrows(NullPointerException.class, () -> priceHolder.putPrice("ENTITY", null));
+    void shouldRejectBothNullArguments() {
+        assertThrows(NullPointerException.class,
+                () -> priceHolder.putPrice(null, null));
     }
 
     @Test
-    @DisplayName("Given entity doesn't exist in pricebook, when getPrice is called, then it throws NullPointerException")
-    void givenUnknownEntity_whenGetPrice_thenThrowsNpe() {
-        // Given
-        PriceHolder priceHolder = new PriceHolder();
-
-        // When / Then
-        assertThrows(NullPointerException.class, () -> priceHolder.getPrice("Testing123"));
+    void shouldRejectEmptyEntityOnPutPrice() {
+        assertThrows(IllegalArgumentException.class,
+                () -> priceHolder.putPrice("", BigDecimal.TEN));
     }
 
     @Test
-    @DisplayName("Given entity doesn't exist in pricebook, when hasPriceChanged is called, then it throws NullPointerException")
-    void givenUnknownEntity_whenHasPriceChanged_thenThrowsNpe() {
-        // Given
-        PriceHolder priceHolder = new PriceHolder();
-
-        // When / Then
-        assertThrows(NullPointerException.class, () -> priceHolder.hasPriceChanged("Testing123"));
+    void shouldRejectNullEntityOnGetPrice() {
+        assertThrows(NullPointerException.class,
+                () -> priceHolder.getPrice(null));
     }
 
     @Test
-    @DisplayName("Given the first put, when getPrice is called, then it returns the same price")
-    void givenFirstPutWhenGetPriceThenReturnsSamePrice() {
-        // Given
-        PriceHolder priceHolder = new PriceHolder();
-        priceHolder.putPrice("StockA", bd("1.1000"));
-
-        // When
-        BigDecimal latest = priceHolder.getPrice("StockA");
-
-        // Then
-        assertEquals(bd("1.1000"), latest);
+    void shouldRejectEmptyEntityOnGetPrice() {
+        assertThrows(IllegalArgumentException.class,
+                () -> priceHolder.getPrice(""));
     }
 
     @Test
-    @DisplayName("Given a new price added, when hasPriceChanged is checked before any get, then it reports a change")
-    void givenFirstPutWhenHasPriceChangedBeforeGetThenTrue() {
-        // Given
-        PriceHolder priceHolder = new PriceHolder();
-
-        // When
-        priceHolder.putPrice("StockA", bd("1.2500"));
-        boolean changed = priceHolder.hasPriceChanged("StockA");
-
-        // Then
-        assertTrue(changed);
+    void shouldRejectNullEntityOnHasPriceChanged() {
+        assertThrows(NullPointerException.class,
+                () -> priceHolder.hasPriceChanged(null));
     }
 
     @Test
-    @DisplayName("Given a seen price, when hasPriceChanged is checked without new puts, then no change")
-    void givenSeenPriceWhenHasPriceChangedThenFalse() {
-        // Given
-        PriceHolder priceHolder = new PriceHolder();
-        priceHolder.putPrice("StockB", bd("722.00"));
-        priceHolder.getPrice("StockB"); // mark as seen
-
-        // When
-        boolean changed = priceHolder.hasPriceChanged("StockB");
-
-        // Then
-        assertFalse(changed);
+    void shouldRejectEmptyEntityOnHasPriceChanged() {
+        assertThrows(IllegalArgumentException.class,
+                () -> priceHolder.hasPriceChanged(""));
     }
 
     @Test
-    @DisplayName("Given a seen price, when a different price is put, then hasPriceChanged returns true")
-    void givenSeenPriceWhenNewPricePutThenHasPriceChangedTrue() {
-        // Given
-        PriceHolder holder = new PriceHolder();
-        holder.putPrice("StockC", bd("323.00"));
-        holder.getPrice("StockC"); // mark as seen
-
-        // When
-        holder.putPrice("StockC", bd("324.25"));
-        boolean changed = holder.hasPriceChanged("StockC");
-
-        // Then
-        assertTrue(changed);
+    void shouldReturnNullForUnknownEntity() {
+        assertNull(priceHolder.getPrice("UNKNOWN"));
     }
 
     @Test
-    @DisplayName("Given a seen price, when the same price with different scale is put, then should NOT count as change")
-    void givenSeenPriceWhenSamePriceDifferentScaleThenNoChange() {
-        // Given
-        PriceHolder holder = new PriceHolder();
-        holder.putPrice("StockD", bd("250"));
-        holder.getPrice("StockD"); // mark as seen
+    void shouldReturnFalseForUnknownEntity() {
+        assertFalse(priceHolder.hasPriceChanged("UNKNOWN"));
+    }
 
-        // When (same numeric value, different scale)
-        holder.putPrice("StockD", bd("250.0"));
-        boolean changed = holder.hasPriceChanged("StockD");
+    @Test
+    void shouldRetrievePriceRegardlessOfSymbolCase() {
 
-        // Then
-        assertFalse(changed);
+        priceHolder.putPrice("AAPL", BigDecimal.valueOf(100));
+
+        assertEquals(
+                BigDecimal.valueOf(100),
+                priceHolder.getPrice("aapl")
+        );
+
+        assertEquals(
+                BigDecimal.valueOf(100),
+                priceHolder.getPrice("AaPl")
+        );
+    }
+
+    @Test
+    void shouldTrackUpdatesAcrossDifferentSymbolCases() {
+
+        priceHolder.putPrice("AAPL", BigDecimal.valueOf(100));
+
+        assertEquals(
+                BigDecimal.valueOf(100),
+                priceHolder.getPrice("aapl")
+        );
+
+        assertFalse(priceHolder.hasPriceChanged("AaPl"));
+
+        priceHolder.putPrice("aapl", BigDecimal.valueOf(200));
+
+        assertTrue(priceHolder.hasPriceChanged("AAPL"));
+
+        assertEquals(
+                BigDecimal.valueOf(200),
+                priceHolder.getPrice("AaPl")
+        );
+
+        assertFalse(priceHolder.hasPriceChanged("aapl"));
+    }
+
+    @Test
+    void shouldReturnLatestPrice() {
+        priceHolder.putPrice("A", BigDecimal.TEN);
+        priceHolder.putPrice("A", BigDecimal.valueOf(12));
+        priceHolder.putPrice("A", BigDecimal.valueOf(15));
+
+        assertEquals(BigDecimal.valueOf(15),
+                priceHolder.getPrice("A"));
+    }
+
+    @Test
+    void shouldResetChangedFlagAfterGetPrice() {
+        priceHolder.putPrice("A", BigDecimal.TEN);
+
+        assertTrue(priceHolder.hasPriceChanged("A"));
+
+        assertEquals(BigDecimal.TEN, priceHolder.getPrice("A"));
+
+        assertFalse(priceHolder.hasPriceChanged("A"));
+    }
+
+    @Test
+    void shouldNotResetChangedFlagWhenCheckingChanged() {
+        priceHolder.putPrice("A", BigDecimal.TEN);
+
+        assertTrue(priceHolder.hasPriceChanged("A"));
+        assertTrue(priceHolder.hasPriceChanged("A"));
+
+        priceHolder.getPrice("A");
+
+        assertFalse(priceHolder.hasPriceChanged("A"));
+    }
+
+    @Test
+    void shouldTrackMultipleEntitiesIndependently() {
+        priceHolder.putPrice("A", BigDecimal.TEN);
+        priceHolder.putPrice("B", BigDecimal.valueOf(20));
+
+        assertEquals(BigDecimal.TEN, priceHolder.getPrice("A"));
+
+        assertFalse(priceHolder.hasPriceChanged("A"));
+        assertTrue(priceHolder.hasPriceChanged("B"));
+
+        assertEquals(BigDecimal.valueOf(20),
+                priceHolder.getPrice("B"));
+
+        assertFalse(priceHolder.hasPriceChanged("B"));
+    }
+
+    @Test
+    void shouldMarkIdenticalPriceUpdateAsChanged() {
+        priceHolder.putPrice("A", BigDecimal.TEN);
+        priceHolder.getPrice("A");
+
+        assertFalse(priceHolder.hasPriceChanged("A"));
+
+        priceHolder.putPrice("A", BigDecimal.TEN);
+
+        assertTrue(priceHolder.hasPriceChanged("A"));
+    }
+
+    @Test
+    void shouldDetectUpdatesEvenWhenPriceReturnsToOriginal() {
+        priceHolder.putPrice("A", BigDecimal.valueOf(100));
+
+        assertEquals(BigDecimal.valueOf(100),
+                priceHolder.getPrice("A"));
+
+        assertFalse(priceHolder.hasPriceChanged("A"));
+
+        priceHolder.putPrice("A", BigDecimal.valueOf(150));
+        priceHolder.putPrice("A", BigDecimal.valueOf(200));
+        priceHolder.putPrice("A", BigDecimal.valueOf(100));
+
+        assertTrue(priceHolder.hasPriceChanged("A"));
+
+        assertEquals(BigDecimal.valueOf(100),
+                priceHolder.getPrice("A"));
+
+        assertFalse(priceHolder.hasPriceChanged("A"));
+    }
+
+    @Test
+    void shouldMatchProvidedExample() {
+        priceHolder.putPrice("a", BigDecimal.TEN);
+
+        assertEquals(BigDecimal.TEN, priceHolder.getPrice("a"));
+
+        priceHolder.putPrice("a", BigDecimal.valueOf(12));
+
+        assertTrue(priceHolder.hasPriceChanged("a"));
+
+        priceHolder.putPrice("b", BigDecimal.valueOf(2));
+        priceHolder.putPrice("a", BigDecimal.valueOf(11));
+
+        assertEquals(BigDecimal.valueOf(11),
+                priceHolder.getPrice("a"));
+
+        assertEquals(BigDecimal.valueOf(11),
+                priceHolder.getPrice("a"));
+
+        assertEquals(BigDecimal.valueOf(2),
+                priceHolder.getPrice("b"));
+    }
+
+    @Test
+    void shouldHandleConcurrentUpdatesToSameEntity()
+            throws Exception {
+
+        int threadCount = 10;
+        int updateCount = 100;
+
+        ExecutorService executor =
+                Executors.newFixedThreadPool(threadCount);
+
+        CountDownLatch start = new CountDownLatch(1);
+        List<Future<?>> futures = new ArrayList<>();
+
+        try {
+            for (int i = 0; i < updateCount; i++) {
+                final int price = i;
+
+                futures.add(executor.submit(() -> {
+                    start.await();
+
+                    priceHolder.putPrice(
+                            "A", BigDecimal.valueOf(price));
+
+                    return null;
+                }));
+            }
+
+            start.countDown();
+
+            for (Future<?> future : futures) {
+                future.get(10, TimeUnit.SECONDS);
+            }
+
+            BigDecimal latest = priceHolder.getPrice("A");
+
+            assertNotNull(latest);
+            assertTrue(latest.compareTo(BigDecimal.ZERO) >= 0);
+            assertTrue(latest.compareTo(
+                    BigDecimal.valueOf(updateCount)) < 0);
+
+            assertFalse(priceHolder.hasPriceChanged("A"));
+
+        } finally {
+            start.countDown();
+            executor.shutdownNow();
+        }
+    }
+
+    @Test
+    void shouldHandleConcurrentReadsAndWrites()
+            throws Exception {
+
+        priceHolder.putPrice("A", BigDecimal.ZERO);
+
+        ExecutorService executor =
+                Executors.newFixedThreadPool(8);
+
+        CountDownLatch start = new CountDownLatch(1);
+        List<Future<?>> futures = new ArrayList<>();
+
+        try {
+            for (int i = 0; i < 4; i++) {
+                final int writerId = i;
+
+                futures.add(executor.submit(() -> {
+                    start.await();
+
+                    for (int j = 0; j < 1000; j++) {
+                        priceHolder.putPrice(
+                                "A",
+                                BigDecimal.valueOf(
+                                        writerId * 1000L + j));
+                    }
+
+                    return null;
+                }));
+            }
+
+            for (int i = 0; i < 4; i++) {
+                futures.add(executor.submit(() -> {
+                    start.await();
+
+                    for (int j = 0; j < 1000; j++) {
+                        BigDecimal price =
+                                priceHolder.getPrice("A");
+
+                        assertNotNull(price);
+                        priceHolder.hasPriceChanged("A");
+                    }
+
+                    return null;
+                }));
+            }
+
+            start.countDown();
+
+            for (Future<?> future : futures) {
+                future.get(15, TimeUnit.SECONDS);
+            }
+
+            assertNotNull(priceHolder.getPrice("A"));
+
+        } finally {
+            start.countDown();
+            executor.shutdownNow();
+        }
+    }
+
+    @Test
+    void shouldHandleConcurrentUpdatesToDifferentEntities()
+            throws Exception {
+
+        int entityCount = 10;
+
+        ExecutorService executor =
+                Executors.newFixedThreadPool(entityCount);
+
+        CountDownLatch start = new CountDownLatch(1);
+        List<Future<?>> futures = new ArrayList<>();
+
+        try {
+            for (int i = 0; i < entityCount; i++) {
+                final int id = i;
+
+                futures.add(executor.submit(() -> {
+                    start.await();
+
+                    String entity = "ENTITY_" + id;
+
+                    for (int j = 0; j < 100; j++) {
+                        priceHolder.putPrice(
+                                entity, BigDecimal.valueOf(j));
+                    }
+
+                    return null;
+                }));
+            }
+
+            start.countDown();
+
+            for (Future<?> future : futures) {
+                future.get(10, TimeUnit.SECONDS);
+            }
+
+            for (int i = 0; i < entityCount; i++) {
+                String entity = "ENTITY_" + i;
+
+                assertTrue(priceHolder.hasPriceChanged(entity));
+
+                assertEquals(BigDecimal.valueOf(99),
+                        priceHolder.getPrice(entity));
+
+                assertFalse(priceHolder.hasPriceChanged(entity));
+            }
+
+        } finally {
+            start.countDown();
+            executor.shutdownNow();
+        }
+    }
+
+    @Test
+    void shouldNotLoseUpdateAfterCompletedRead()
+            throws Exception {
+
+        priceHolder.putPrice("A", BigDecimal.TEN);
+
+        ExecutorService executor =
+                Executors.newFixedThreadPool(2);
+
+        CountDownLatch readCompleted = new CountDownLatch(1);
+
+        try {
+            Future<?> reader = executor.submit(() -> {
+                assertEquals(BigDecimal.TEN,
+                        priceHolder.getPrice("A"));
+
+                readCompleted.countDown();
+            });
+
+            Future<?> writer = executor.submit(() -> {
+                assertTrue(readCompleted.await(
+                        5, TimeUnit.SECONDS));
+
+                priceHolder.putPrice(
+                        "A", BigDecimal.valueOf(20));
+
+                return null;
+            });
+
+            reader.get(10, TimeUnit.SECONDS);
+            writer.get(10, TimeUnit.SECONDS);
+
+            assertTrue(priceHolder.hasPriceChanged("A"));
+
+            assertEquals(BigDecimal.valueOf(20),
+                    priceHolder.getPrice("A"));
+
+            assertFalse(priceHolder.hasPriceChanged("A"));
+
+        } finally {
+            executor.shutdownNow();
+        }
     }
 }
