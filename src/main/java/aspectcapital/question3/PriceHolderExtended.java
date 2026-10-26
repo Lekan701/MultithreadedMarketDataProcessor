@@ -48,7 +48,7 @@ public final class PriceHolderExtended {
             synchronized (state) {
                 state.price = p;
                 state.changed = true;
-                state.notifyAll();;
+                state.notifyAll();
             }
 
             return state;

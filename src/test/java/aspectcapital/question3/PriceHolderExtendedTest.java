@@ -8,6 +8,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.time.Duration;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -619,47 +621,70 @@ class PriceHolderExtendedTest {
         }
     }
 
+
     @Test
     void shouldHandleMultipleWaitingConsumers() throws Exception {
 
         priceHolder.putPrice("A", BigDecimal.TEN);
         priceHolder.getPrice("A");
 
-        ExecutorService executor =
-                Executors.newFixedThreadPool(2);
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+
+        AtomicReference<Thread> firstThread = new AtomicReference<>();
+        AtomicReference<Thread> secondThread = new AtomicReference<>();
 
         CompletionService<BigDecimal> completion =
                 new ExecutorCompletionService<>(executor);
 
         try {
-            completion.submit(
-                    () -> priceHolder.waitForNextPrice("A"));
+            completion.submit(() -> {
+                firstThread.set(Thread.currentThread());
+                return priceHolder.waitForNextPrice("A");
+            });
 
-            completion.submit(
-                    () -> priceHolder.waitForNextPrice("A"));
+            completion.submit(() -> {
+                secondThread.set(Thread.currentThread());
+                return priceHolder.waitForNextPrice("A");
+            });
 
+            // Confirm both consumers are waiting.
+            assertTimeoutPreemptively(
+                    Duration.ofSeconds(5),
+                    () -> {
+                        while (firstThread.get() == null ||
+                                secondThread.get() == null ||
+                                firstThread.get().getState() != Thread.State.WAITING ||
+                                secondThread.get().getState() != Thread.State.WAITING) {
+
+                            Thread.sleep(10);
+                        }
+                    }
+            );
+
+            // First update: one consumer should return 200.
             priceHolder.putPrice("A", BigDecimal.valueOf(200));
 
             Future<BigDecimal> firstCompleted =
                     completion.poll(5, TimeUnit.SECONDS);
 
             assertNotNull(firstCompleted);
+            assertEquals(BigDecimal.valueOf(200), firstCompleted.get());
 
-            assertEquals(BigDecimal.valueOf(200),
-                    firstCompleted.get());
+            // The second consumer should still be waiting.
+            assertNull(completion.poll(200, TimeUnit.MILLISECONDS));
 
+            // Second update: remaining consumer receives 300.
             priceHolder.putPrice("A", BigDecimal.valueOf(300));
 
             Future<BigDecimal> secondCompleted =
                     completion.poll(5, TimeUnit.SECONDS);
 
             assertNotNull(secondCompleted);
-
-            assertEquals(BigDecimal.valueOf(300),
-                    secondCompleted.get());
+            assertEquals(BigDecimal.valueOf(300), secondCompleted.get());
 
         } finally {
             executor.shutdownNow();
         }
     }
+
 }
